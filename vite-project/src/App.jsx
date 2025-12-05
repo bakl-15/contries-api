@@ -1,8 +1,11 @@
+// src/App.jsx
 import { useState, useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { getCountries } from "./Features/CountrySlice";
 import Card from "./Components/Cards/Card";
 import { CirclesWithBar } from "react-loader-spinner";
+import usePagination from "./Hook/usePagination";
+import PaginationBar from "./Components/Pagination/Pagination";
 
 function App() {
   const dispatch = useDispatch();
@@ -17,51 +20,54 @@ function App() {
   const [populationMax, setPopulationMax] = useState("");
   const [areaMin, setAreaMin] = useState("");
   const [areaMax, setAreaMax] = useState("");
+  const [total, setTotal] = useState({});
+
+  // Calcul total population et surface
+  const getTotal = (countries) => {
+    return {
+      population: new Intl.NumberFormat("fr-FR").format(
+        countries.reduce((acc, country) => acc + country.population, 0)
+      ),
+      surface: new Intl.NumberFormat("fr-FR").format(
+        countries.reduce((acc, country) => acc + country.area, 0)
+      ),
+    };
+  };
 
   // Récupération des pays
   useEffect(() => {
     dispatch(getCountries())
       .unwrap()
-      .then((data) => setAllCountries(data))
+      .then((data) => {
+        setAllCountries(data);
+        setTotal(getTotal(data));
+      })
       .catch((err) => console.error(err));
   }, [dispatch]);
 
   // Filtrage combiné
   const filteredCountries = useMemo(() => {
     return allCountries.filter((country) => {
-      // Recherche par nom
       if (
         searchInput &&
         !country.name.common.toLowerCase().includes(searchInput.toLowerCase())
-      ) {
-        return false;
-      }
+      ) return false;
 
-      // Filtre par région
-      if (regionFilter !== "All" && country.region !== regionFilter) {
+      if (regionFilter !== "All" && country.region !== regionFilter) return false;
+      if (subregionFilter !== "All" && country.subregion !== subregionFilter)
         return false;
-      }
 
-      // Filtre par sous-région
-      if (subregionFilter !== "All" && country.subregion !== subregionFilter) {
-        return false;
-      }
-
-      // Filtre par population min/max
       if (
         (populationMin && country.population < parseInt(populationMin)) ||
         (populationMax && country.population > parseInt(populationMax))
-      ) {
+      )
         return false;
-      }
 
-      // Filtre par surface min/max
       if (
         (areaMin && country.area < parseInt(areaMin)) ||
         (areaMax && country.area > parseInt(areaMax))
-      ) {
+      )
         return false;
-      }
 
       return true;
     });
@@ -76,21 +82,38 @@ function App() {
     areaMax,
   ]);
 
-  // Extraire les sous-régions dynamiquement
+  // Sous-régions dynamiques
   const subregions = [...new Set(allCountries.map((c) => c.subregion).filter(Boolean))];
+
+  // --- Pagination ---
+  const {
+    currentPage,
+    totalPages,
+    goToPage,
+    sliceData,
+  } = usePagination({
+    totalItems: filteredCountries.length,
+    itemsPerPage: 12,
+    initialPage: 1,
+  });
 
   return (
     <div className="bg-[#131314] min-h-screen w-screen overflow-y-auto">
+      {/* Header */}
       <div className="flex m-20 mb-3 bg-[#1E1F20] font-bold text-lg text-white text-center p-7">
         <h1 className="text-blue-500 flex-1">EXPLORATEUR DE PAYS 🌍</h1>
         <div>
-           <p className="text-yellow-500 text-xs italic font-extralight">Nombre de population : 152 (55%)</p>
-           <p className="text-yellow-500 text-xs italic font-extralight">Surface totale: 152 (12%)</p>
+          <p className="text-yellow-500 text-xs italic font-extralight">
+            Nombre de population : {total.population}
+          </p>
+          <p className="text-yellow-500 text-xs italic font-extralight">
+            Surface totale : {total.surface} KM
+          </p>
         </div>
       </div>
 
       {/* Filtres */}
-      <div className="flex  justify-between items-center mt-3 mx-20 bg-[#1E1F20] p-3 rounded gap-4">
+      <div className="flex justify-between items-center mt-3 mx-20 bg-[#1E1F20] p-3 rounded gap-4">
         {/* Recherche */}
         <input
           className="flex-1 border border-gray-500 text-white h-10 p-2 rounded bg-[#1E1F22]"
@@ -102,7 +125,7 @@ function App() {
 
         {/* Région */}
         <select
-          className="border border-white cursor-pointer bg-[#1E1F22] p-1 w-40 h-10 text-white font-bold rounded"
+          className="border border-white cursor-pointer bg-[#1E1F22] p-1 w-50 h-10 text-white font-bold rounded"
           value={regionFilter}
           onChange={(e) => setRegionFilter(e.target.value)}
         >
@@ -116,7 +139,7 @@ function App() {
 
         {/* Sous-région */}
         <select
-          className="border border-white cursor-pointer bg-[#1E1F22] p-1 w-40 h-10 text-white font-bold rounded"
+          className="border border-white cursor-pointer bg-[#1E1F22] p-1 w-50 h-10 text-white font-bold rounded"
           value={subregionFilter}
           onChange={(e) => setSubregionFilter(e.target.value)}
         >
@@ -127,7 +150,7 @@ function App() {
             </option>
           ))}
         </select>
-       
+
         {/* Population min/max */}
         <input
           className="border border-white text-white h-10 p-2 rounded bg-[#1E1F22] w-32"
@@ -161,17 +184,9 @@ function App() {
         />
       </div>
 
-      {/* Liste des pays */}
+      {/* Liste des pays + pagination */}
       <div className="flex flex-wrap justify-around items-start mt-10 mx-20">
-        {status !== "loading" ? (
-          filteredCountries.length > 0 ? (
-            filteredCountries.map((country) => <Card key={country.name.common} country={country} />)
-          ) : (
-            <p className="text-white text-center w-full mt-10">
-              Aucun pays trouvé pour ces critères.
-            </p>
-          )
-        ) : (
+        {status === "loading" ? (
           <div className="w-full flex justify-center mt-20">
             <CirclesWithBar
               height="100"
@@ -184,6 +199,23 @@ function App() {
               visible={true}
             />
           </div>
+        ) : filteredCountries.length === 0 ? (
+          <p className="text-white text-center w-full mt-10">
+            Aucun pays trouvé pour ces critères.
+          </p>
+        ) : (
+          <>
+            {sliceData(filteredCountries).map((country) => (
+              <Card key={country.name.common} country={country} />
+            ))}
+
+            <PaginationBar
+              page={currentPage}
+              totalPages={totalPages}
+              setPage={goToPage}
+              isLoading={status === "loading"}
+            />
+          </>
         )}
       </div>
     </div>
