@@ -4,8 +4,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { getCountries } from "./Features/CountrySlice";
 import Card from "./Components/Cards/Card";
 import { CirclesWithBar } from "react-loader-spinner";
-import usePagination from "./Hook/usePagination";
-import PaginationBar from "./Components/Pagination/Pagination";
+import ReactPaginate from "react-paginate";
 
 function App() {
   const dispatch = useDispatch();
@@ -21,6 +20,10 @@ function App() {
   const [areaMin, setAreaMin] = useState("");
   const [areaMax, setAreaMax] = useState("");
   const [total, setTotal] = useState({});
+
+  // Pagination
+  const [pageNumber, setPageNumber] = useState(0);
+  const itemsPerPage = 12;
 
   // Calcul total population et surface
   const getTotal = (countries) => {
@@ -51,7 +54,8 @@ function App() {
       if (
         searchInput &&
         !country.name.common.toLowerCase().includes(searchInput.toLowerCase())
-      ) return false;
+      )
+        return false;
 
       if (regionFilter !== "All" && country.region !== regionFilter) return false;
       if (subregionFilter !== "All" && country.subregion !== subregionFilter)
@@ -85,17 +89,18 @@ function App() {
   // Sous-régions dynamiques
   const subregions = [...new Set(allCountries.map((c) => c.subregion).filter(Boolean))];
 
-  // --- Pagination ---
-  const {
-    currentPage,
-    totalPages,
-    goToPage,
-    sliceData,
-  } = usePagination({
-    totalItems: filteredCountries.length,
-    itemsPerPage: 12,
-    initialPage: 1,
-  });
+  // Pagination ReactPaginate
+  const pagesVisited = pageNumber * itemsPerPage;
+  const pageCount = Math.ceil(filteredCountries.length / itemsPerPage);
+
+  const displayCountries = filteredCountries.slice(
+    pagesVisited,
+    pagesVisited + itemsPerPage
+  );
+
+  const changePage = ({ selected }) => {
+    setPageNumber(selected);
+  };
 
   return (
     <div className="bg-[#131314] min-h-screen w-screen overflow-y-auto">
@@ -205,16 +210,25 @@ function App() {
           </p>
         ) : (
           <>
-            {sliceData(filteredCountries).map((country) => (
+            {displayCountries.map((country) => (
               <Card key={country.name.common} country={country} />
             ))}
 
-            <PaginationBar
-              page={currentPage}
-              totalPages={totalPages}
-              setPage={goToPage}
-              isLoading={status === "loading"}
-            />
+            {/* ReactPaginate */}
+            <div className="w-full flex justify-center mt-10">
+              <ReactPaginate
+                previousLabel={"← Précédent"}
+                nextLabel={"Suivant →"}
+                pageCount={pageCount}
+                onPageChange={changePage}
+                containerClassName={"flex gap-2"}
+                previousLinkClassName={"px-4 py-2 bg-gray-700 rounded"}
+                nextLinkClassName={"px-4 py-2 bg-gray-700 rounded"}
+                disabledClassName={"opacity-50 cursor-not-allowed"}
+                activeClassName={"bg-blue-500 text-white px-4 py-2 rounded"}
+                pageLinkClassName={"px-4 py-2 bg-gray-700 rounded"}
+              />
+            </div>
           </>
         )}
       </div>
